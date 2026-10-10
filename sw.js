@@ -1,5 +1,5 @@
 // Offline-Speicher: legt Zugangsseite und verschlüsselten Inhalt beim ersten Öffnen ab.
-var STAND = 'training-2';
+var STAND = 'training-3';
 var DATEIEN = ['./', 'index.html', 'inhalt.bin', 'manifest.webmanifest', 'symbol-180.png', 'symbol-192.png', 'symbol-512.png', 'symbol-maskable-512.png'];
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(STAND).then(function(c){ return c.addAll(DATEIEN.map(function(u){ return new Request(u, {cache: 'reload'}); })); }).then(function(){ return self.skipWaiting(); }));
