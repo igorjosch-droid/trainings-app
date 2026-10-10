@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#1B252F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="symbol-180.png">
+<link rel="icon" href="symbol-192.png">
+<title>Training</title>
+<style>
+:root{--navy:#1B252F;--orange:#FF9900}
+html,body{margin:0;height:100%;background:var(--navy);color:#fff;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.zugang{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;text-align:center}
+.ring{width:64px;height:64px;border-radius:50%;border:5px solid var(--orange);box-sizing:border-box;margin-bottom:18px}
+p{color:#AEB8C2;margin:0 0 16px;font-size:15px}
+form{width:100%;max-width:320px}
+input{width:100%;box-sizing:border-box;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#232F3B;color:#fff;font-size:17px;text-align:center;outline:none}
+button{margin-top:12px;width:100%;min-height:50px;border:0;border-radius:12px;background:var(--orange);color:#fff;font-weight:700;font-size:16px}
+.fehler{color:#FF8A80;min-height:22px;margin-top:10px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="zugang">
+  <div class="ring"></div>
+  <p id="text">Privater Zugang</p>
+  <form id="formular" hidden>
+    <input id="wort" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Zugangswort">
+    <button type="submit">Öffnen</button>
+  </form>
+  <div class="fehler" id="fehler"></div>
+</div>
+<script>
+// Der Inhalt liegt nur verschlüsselt auf dem Server. Der Schlüssel ist das Zugangswort im Link (nach dem #),
+// das nie an den Server geht. Nach dem ersten Öffnen merkt sich dieses Gerät das Wort.
+(function(){
+  var MERKER = 'zugang';
+  function bytes(s){ var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function formular(meldung){
+    document.getElementById('text').textContent = 'Privater Zugang';
+    document.getElementById('formular').hidden = false;
+    document.getElementById('fehler').textContent = meldung || '';
+  }
+  function oeffnen(wort){
+    document.getElementById('text').textContent = 'Wird geöffnet';
+    return fetch('inhalt.bin').then(function(r){ if (!r.ok) throw new Error('fehlt'); return r.json(); }).then(function(d){
+      return crypto.subtle.importKey('raw', new TextEncoder().encode(wort), 'PBKDF2', false, ['deriveKey']).then(function(k){
+        return crypto.subtle.deriveKey({name:'PBKDF2', salt:bytes(d.salz), iterations:d.iter, hash:'SHA-256'}, k, {name:'AES-GCM', length:256}, false, ['decrypt']);
+      }).then(function(s){ return crypto.subtle.decrypt({name:'AES-GCM', iv:bytes(d.iv)}, s, bytes(d.daten)); });
+    }).then(function(roh){
+      try { localStorage.setItem(MERKER, wort); } catch (e) {}
+      var html = new TextDecoder().decode(roh);
+      document.open(); document.write(html); document.close();
+    });
+  }
+  var ausLink = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim().toLowerCase();
+  var gemerkt = null;
+  try { gemerkt = localStorage.getItem(MERKER); } catch (e) {}
+  var wort = ausLink || gemerkt;
+  if (wort) {
+    oeffnen(wort).catch(function(){ try { localStorage.removeItem(MERKER); } catch (e) {} formular(ausLink ? 'Der Link ist nicht vollständig.' : ''); });
+  } else {
+    formular('');
+  }
+  document.getElementById('formular').addEventListener('submit', function(e){
+    e.preventDefault();
+    var w = document.getElementById('wort').value.trim().toLowerCase();
+    if (!w) return;
+    oeffnen(w).catch(function(){ formular('Das Zugangswort stimmt nicht.'); });
+  });
+  if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(function(){}); }
+})();
+</script>
+</body>
+</html>
